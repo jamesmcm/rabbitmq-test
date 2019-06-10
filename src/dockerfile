@@ -1,0 +1,24 @@
+FROM python:3.6-alpine
+
+COPY requirements.txt /requirements.txt
+COPY pipeline/ /solution/pipeline/
+
+RUN  apk update \
+	&& apk add --virtual mysqlclient --no-cache \
+		mariadb-connector-c-dev \
+		mysql-client \
+	&& apk add --no-cache --virtual .build-dependencies \
+		build-base \
+		gcc \
+		musl-dev \
+		python3-dev \
+	&& pip install --no-cache-dir -r requirements.txt \
+	&& apk --purge del .build-dependencies
+
+
+WORKDIR /solution/pipeline
+
+RUN ["chmod", "+x", "./run_pipeline.sh"]
+RUN ["chmod", "+x", "./waitForMySQL.sh"]
+
+CMD ["/bin/sh", "./run_pipeline.sh"]

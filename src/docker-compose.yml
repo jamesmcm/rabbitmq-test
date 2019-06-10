@@ -1,0 +1,62 @@
+services:
+  adminer:
+    depends_on:
+    - db
+    image: adminer
+    ports:
+    - 8080:8080/tcp
+    restart: unless-stopped
+  cassandra:
+      image: cassandra:latest
+      container_name: cassandra
+      ports:
+        - "9042:9042"
+      environment:
+        - "MAX_HEAP_SIZE=256M"
+        - "HEAP_NEWSIZE=128M"
+      restart: unless-stopped
+  cassandra-load-keyspace:
+      container_name: cassandra-load-keyspace
+      image: cassandra:latest
+      depends_on:
+        - cassandra
+      volumes:
+        - ./init_cassandra.cql:/schema.cql
+        - ../input:/input
+      command: /bin/bash -c "sleep 25 && echo loading cassandra keyspace && cqlsh cassandra -f /schema.cql"
+  db:
+    environment:
+      MYSQL_DATABASE: rmqtest
+      MYSQL_ROOT_PASSWORD: groot
+    image: mariadb:10
+    ports:
+    - 3306:3306/tcp
+    volumes:
+    - ./init.sql:/docker-entrypoint-initdb.d/init.sql:rw
+    - ../input:/var/lib/mysql-files:rw
+    restart: unless-stopped
+  rabbit:
+    image: rabbitmq:3
+    ports:
+    - 5672:5672/tcp
+    restart: unless-stopped
+  redis:
+    image: redis:alpine
+    ports:
+    - 6379:6379/tcp
+    restart: unless-stopped
+  worker:
+    build: .
+    depends_on:
+    - adminer
+    - rabbit
+    environment:
+      DELAY: '${DELAY}'
+      MYSQL_PASSWORD: groot
+      MYSQL_USER: root
+      SECS_PER_DAY: '${SECS_PER_DAY}'
+    volumes:
+    - ../input:/input:rw
+    - ../log_gen:/log_gen:rw
+    restart: on-failure
+version: '3.0'
